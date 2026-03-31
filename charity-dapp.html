@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ChainGive — Blockchain Charity Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161921;
+    --surface2: #1e2230;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8ecf4;
+    --muted: #7a8299;
+    --accent: #4ade80;
+    --accent2: #22d3ee;
+    --accent3: #f59e0b;
+    --danger: #f87171;
+    --purple: #a78bfa;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; min-height: 100vh; }
+
+  /* ── LAYOUT ── */
+  .app { display: flex; min-height: 100vh; }
+  .sidebar { width: 220px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; height: 100vh; overflow-y: auto; }
+  .main { margin-left: 220px; flex: 1; min-height: 100vh; padding: 32px; }
+
+  /* ── SIDEBAR ── */
+  .logo { padding: 24px 20px 16px; }
+  .logo-mark { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; color: var(--accent); letter-spacing: -0.5px; }
+  .logo-sub { font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+  .nav { padding: 8px 12px; flex: 1; }
+  .nav-section { font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; padding: 12px 8px 6px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 400; margin-bottom: 2px; transition: all 0.15s; border: none; background: none; width: 100%; text-align: left; }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(74,222,128,0.12); color: var(--accent); }
+  .nav-icon { width: 16px; height: 16px; opacity: 0.8; }
+  .wallet-section { padding: 16px; border-top: 1px solid var(--border); }
+  .wallet-status { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .wallet-addr { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent2); word-break: break-all; }
+  .connect-btn { width: 100%; padding: 9px; background: var(--accent); color: #0d0f14; border: none; border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; }
+  .connect-btn:hover { opacity: 0.88; }
+  .connect-btn.connected { background: var(--surface2); color: var(--accent); border: 1px solid rgba(74,222,128,0.3); }
+
+  /* ── SECTIONS ── */
+  .section { display: none; }
+  .section.active { display: block; }
+  .page-header { margin-bottom: 28px; }
+  .page-title { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 300; color: var(--text); margin-bottom: 6px; }
+  .page-sub { color: var(--muted); font-size: 13px; }
+
+  /* ── STAT CARDS ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
+  .stat-value { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 300; color: var(--text); }
+  .stat-value.green { color: var(--accent); }
+  .stat-value.cyan { color: var(--accent2); }
+  .stat-value.amber { color: var(--accent3); }
+  .stat-value.purple { color: var(--purple); }
+  .stat-change { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* ── CARDS & TABLES ── */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 20px; }
+  .card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .card-title { font-size: 13px; font-weight: 500; color: var(--text); }
+  .card-body { padding: 20px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; padding: 0 16px 12px; text-align: left; font-weight: 400; }
+  td { padding: 12px 16px; font-size: 13px; border-top: 1px solid var(--border); color: var(--text); }
+  tr:first-child td { border-top: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ── CHARITY GRID ── */
+  .charity-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .charity-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; transition: border-color 0.15s; cursor: pointer; }
+  .charity-card:hover { border-color: var(--border2); }
+  .charity-card.selected { border-color: rgba(74,222,128,0.4); }
+  .charity-name { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 300; margin-bottom: 6px; }
+  .charity-desc { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+  .charity-meta { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .badge { font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 500; }
+  .badge-green { background: rgba(74,222,128,0.15); color: var(--accent); }
+  .badge-red { background: rgba(248,113,113,0.15); color: var(--danger); }
+  .badge-cyan { background: rgba(34,211,238,0.15); color: var(--accent2); }
+  .badge-amber { background: rgba(245,158,11,0.15); color: var(--accent3); }
+  .badge-purple { background: rgba(167,139,250,0.15); color: var(--purple); }
+  .charity-stats { display: flex; gap: 20px; }
+  .c-stat { text-align: center; }
+  .c-stat-val { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--accent); }
+  .c-stat-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .donate-btn { margin-top: 14px; width: 100%; padding: 9px; background: rgba(74,222,128,0.1); color: var(--accent); border: 1px solid rgba(74,222,128,0.25); border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .donate-btn:hover { background: rgba(74,222,128,0.2); }
+
+  /* ── FORMS ── */
+  .form-group { margin-bottom: 18px; }
+  .form-label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
+  .form-input, .form-select, .form-textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color 0.15s; }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: rgba(74,222,128,0.4); }
+  .form-select option { background: var(--surface2); }
+  .form-textarea { resize: vertical; min-height: 80px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .submit-btn { padding: 11px 24px; background: var(--accent); color: #0d0f14; border: none; border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; }
+  .submit-btn:hover { opacity: 0.88; }
+  .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-secondary { padding: 11px 24px; background: transparent; color: var(--muted); border: 1px solid var(--border2); border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; margin-right: 10px; transition: all 0.15s; }
+  .btn-secondary:hover { color: var(--text); border-color: var(--border2); }
+
+  /* ── MODAL ── */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 28px; width: 460px; max-width: 95vw; }
+  .modal-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 300; margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+  /* ── ALERTS ── */
+  .alert { padding: 12px 16px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 16px; display: none; }
+  .alert.show { display: block; }
+  .alert-success { background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25); color: var(--accent); }
+  .alert-error { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); color: var(--danger); }
+  .alert-info { background: rgba(34,211,238,0.1); border: 1px solid rgba(34,211,238,0.25); color: var(--accent2); }
+
+  /* ── MISC ── */
+  .mono { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+  .text-green { color: var(--accent); }
+  .text-muted { color: var(--muted); }
+  .flex-between { display: flex; align-items: center; justify-content: space-between; }
+  .progress-bar { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; margin-top: 8px; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.4s; }
+  .empty-state { text-align: center; padding: 40px; color: var(--muted); }
+  .empty-state-icon { font-size: 36px; margin-bottom: 12px; }
+  .network-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; background: rgba(245,158,11,0.1); color: var(--accent3); border: 1px solid rgba(245,158,11,0.2); border-radius: 20px; padding: 4px 10px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .contract-info { background: var(--surface2); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 20px; font-size: 12px; }
+  .contract-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .contract-row:last-child { margin-bottom: 0; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab { padding: 7px 16px; border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; color: var(--muted); background: none; border: 1px solid transparent; transition: all 0.15s; }
+  .tab.active { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .main { margin-left: 0; padding: 20px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 500px) {
+    .stats-grid { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">ChainGive</div>
+    <div class="logo-sub">Donation Tracker</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">Main</div>
+    <button class="nav-item active" onclick="showSection('dashboard')">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      Dashboard
+    </button>
+    <button class="nav-item" onclick="showSection('charities')">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+      Charities
+    </button>
+    <button class="nav-item" onclick="showSection('donate')">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Donate
+    </button>
+    <div class="nav-section">Records</div>
+    <button class="nav-item" onclick="showSection('history')">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      History
+    </button>
+    <button class="nav-item" onclick="showSection('reports')">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      Reports
+    </button>
+    <div class="nav-section">Admin</div>
+    <button class="nav-item" onclick="showSection('manage')">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      Manage
+    </button>
+    <button class="nav-item" onclick="showSection('setup')">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+      Setup
+    </button>
+  </nav>
+  <div class="wallet-section">
+    <div class="wallet-status" id="walletStatus">Not connected</div>
+    <div class="wallet-addr" id="walletAddr" style="display:none;margin-bottom:8px;"></div>
+    <button class="connect-btn" id="connectBtn" onclick="connectWallet()">Connect MetaMask</button>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<main class="main">
+
+  <!-- DASHBOARD -->
+  <div class="section active" id="sec-dashboard">
+    <div class="page-header flex-between">
+      <div>
+        <div class="page-title">Dashboard</div>
+        <div class="page-sub">Live on-chain overview</div>
+      </div>
+      <div class="network-badge"><div class="dot"></div><span id="networkName">Not connected</span></div>
+    </div>
+    <div id="dashAlert" class="alert alert-info">Connect MetaMask and set up your contract to load live data.</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Total Raised</div><div class="stat-value green" id="statTotal">0.000</div><div class="stat-change">ETH across all charities</div></div>
+      <div class="stat-card"><div class="stat-label">Donations</div><div class="stat-value cyan" id="statDonations">0</div><div class="stat-change">On-chain transactions</div></div>
+      <div class="stat-card"><div class="stat-label">Charities</div><div class="stat-value amber" id="statCharities">0</div><div class="stat-change">Registered organizations</div></div>
+      <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value purple" id="statActive">0</div><div class="stat-change">Currently accepting</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Top Charities by Donations Received</span><button class="btn-secondary" style="padding:6px 14px;font-size:11px;" onclick="loadDashboard()">Refresh</button></div>
+      <div id="topCharitiesTable"><div class="empty-state"><div class="empty-state-icon">🔗</div><div>Connect wallet and load contract to see data</div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Recent Donations</span></div>
+      <div id="recentDonationsTable"><div class="empty-state"><div class="empty-state-icon">📋</div><div>No donations loaded</div></div></div>
+    </div>
+  </div>
+
+  <!-- CHARITIES -->
+  <div class="section" id="sec-charities">
+    <div class="page-header flex-between">
+      <div><div class="page-title">Charities</div><div class="page-sub">Browse all registered organizations</div></div>
+      <select class="form-select" style="width:180px;" onchange="filterCharities(this.value)">
+        <option value="all">All Categories</option>
+        <option value="Education">Education</option>
+        <option value="Health">Health</option>
+        <option value="Environment">Environment</option>
+        <option value="Poverty">Poverty</option>
+        <option value="Disaster Relief">Disaster Relief</option>
+        <option value="Animal Welfare">Animal Welfare</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div id="charityGrid" class="charity-grid"><div class="empty-state"><div class="empty-state-icon">💚</div><div>No charities found. Add one in Manage tab.</div></div></div>
+  </div>
+
+  <!-- DONATE -->
+  <div class="section" id="sec-donate">
+    <div class="page-header"><div class="page-title">Make a Donation</div><div class="page-sub">Send ETH directly to a charity on-chain</div></div>
+    <div id="donateAlert" class="alert"></div>
+    <div class="card" style="max-width:560px;">
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Select Charity</label>
+          <select class="form-select" id="donateCharitySelect"><option value="">— Choose a charity —</option></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Amount (ETH)</label>
+          <input type="number" class="form-input" id="donateAmount" placeholder="0.01" step="0.001" min="0.001"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Message (optional)</label>
+          <textarea class="form-textarea" id="donateMessage" placeholder="Leave an encouraging message..."></textarea>
+        </div>
+        <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:14px;margin-bottom:18px;font-size:12px;color:var(--muted);">
+          <div style="margin-bottom:4px;">⚡ Funds transfer directly to the charity wallet — no intermediary.</div>
+          <div>🔒 Transaction recorded immutably on Ethereum blockchain.</div>
+        </div>
+        <button class="submit-btn" id="donateSubmitBtn" onclick="submitDonation()">Send Donation via MetaMask</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="section" id="sec-history">
+    <div class="page-header"><div class="page-title">Donation History</div><div class="page-sub">All on-chain donation records</div></div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchHistoryTab('all', this)">All Donations</button>
+      <button class="tab" onclick="switchHistoryTab('mine', this)">My Donations</button>
+    </div>
+    <div class="card">
+      <div id="historyTable"><div class="empty-state"><div class="empty-state-icon">🕐</div><div>No history loaded. Connect wallet first.</div></div></div>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div class="section" id="sec-reports">
+    <div class="page-header"><div class="page-title">Reports</div><div class="page-sub">Transparency analytics</div></div>
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
+      <div class="stat-card"><div class="stat-label">My Total Given</div><div class="stat-value green" id="rptMyTotal">0.000</div><div class="stat-change">ETH</div></div>
+      <div class="stat-card"><div class="stat-label">My Donations</div><div class="stat-value cyan" id="rptMyCount">0</div><div class="stat-change">Transactions</div></div>
+      <div class="stat-card"><div class="stat-label">Charities Supported</div><div class="stat-value amber" id="rptMyCharities">0</div><div class="stat-change">Unique orgs</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Charity Breakdown</span><button class="btn-secondary" style="padding:6px 14px;font-size:11px;" onclick="loadReports()">Refresh</button></div>
+      <div id="charityBreakdown"><div class="empty-state"><div class="empty-state-icon">📊</div><div>Connect wallet to load report</div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">My Donation Timeline</span></div>
+      <div id="myTimeline"><div class="empty-state"><div class="empty-state-icon">📅</div><div>No personal history yet</div></div></div>
+    </div>
+  </div>
+
+  <!-- MANAGE -->
+  <div class="section" id="sec-manage">
+    <div class="page-header"><div class="page-title">Manage Charities</div><div class="page-sub">Owner-only controls</div></div>
+    <div id="manageAlert" class="alert"></div>
+    <div class="card" style="max-width:640px;">
+      <div class="card-header"><span class="card-title">Add New Charity</span></div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Charity Name</label>
+            <input type="text" class="form-input" id="mgmtName" placeholder="e.g. Save the Children"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <select class="form-select" id="mgmtCategory">
+              <option>Education</option><option>Health</option><option>Environment</option>
+              <option>Poverty</option><option>Disaster Relief</option><option>Animal Welfare</option><option>Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-textarea" id="mgmtDesc" placeholder="Brief description of the charity's mission..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Charity Wallet Address</label>
+          <input type="text" class="form-input" id="mgmtWallet" placeholder="0x..."/>
+        </div>
+        <button class="submit-btn" onclick="addCharity()">Add Charity to Blockchain</button>
+      </div>
+    </div>
+    <div class="card" style="max-width:640px;margin-top:20px;">
+      <div class="card-header"><span class="card-title">Existing Charities</span></div>
+      <div id="manageList"><div class="empty-state"><div class="empty-state-icon">📋</div><div>No charities loaded</div></div></div>
+    </div>
+  </div>
+
+  <!-- SETUP -->
+  <div class="section" id="sec-setup">
+    <div class="page-header"><div class="page-title">Setup & Contract</div><div class="page-sub">Configure your deployed contract</div></div>
+    <div id="setupAlert" class="alert"></div>
+    <div class="card" style="max-width:600px;">
+      <div class="card-header"><span class="card-title">Contract Configuration</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Deployed Contract Address</label>
+          <input type="text" class="form-input" id="contractAddressInput" placeholder="0x... (paste after deploying on Remix)"/>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="submit-btn" onclick="saveContractAddress()">Connect to Contract</button>
+          <button class="btn-secondary" onclick="useDemoMode()">Demo Mode (Mock Data)</button>
+        </div>
+        <div style="margin-top:20px;" id="contractStatus"></div>
+      </div>
+    </div>
+    <div class="card" style="max-width:600px;margin-top:20px;">
+      <div class="card-header"><span class="card-title">Deployment Guide</span></div>
+      <div class="card-body" style="font-size:13px;line-height:1.8;color:var(--muted);">
+        <div style="margin-bottom:12px;"><strong style="color:var(--text);">Step 1</strong> — Open <a href="https://remix.ethereum.org" target="_blank" style="color:var(--accent2);">Remix IDE</a> in your browser.</div>
+        <div style="margin-bottom:12px;"><strong style="color:var(--text);">Step 2</strong> — Create a new file, paste the <code style="color:var(--accent);">CharityDonation.sol</code> contract code.</div>
+        <div style="margin-bottom:12px;"><strong style="color:var(--text);">Step 3</strong> — Compile with Solidity <code style="color:var(--accent);">^0.8.19</code>.</div>
+        <div style="margin-bottom:12px;"><strong style="color:var(--text);">Step 4</strong> — In Deploy tab, select <strong style="color:var(--text);">Injected Provider - MetaMask</strong> and deploy to Sepolia testnet.</div>
+        <div style="margin-bottom:12px;"><strong style="color:var(--text);">Step 5</strong> — Copy the deployed contract address and paste it above.</div>
+        <div style="padding:12px;background:var(--surface2);border-radius:var(--radius-sm);color:var(--accent3);font-size:12px;">💡 Use Sepolia ETH faucet (sepoliafaucet.com) to get free test ETH.</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-title">Edit Charity</div>
+    <input type="hidden" id="editId"/>
+    <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-input" id="editName"/></div>
+    <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="editDesc"></textarea></div>
+    <div class="form-group"><label class="form-label">Category</label>
+      <select class="form-select" id="editCat">
+        <option>Education</option><option>Health</option><option>Environment</option>
+        <option>Poverty</option><option>Disaster Relief</option><option>Animal Welfare</option><option>Other</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Active</label>
+      <select class="form-select" id="editActive"><option value="true">Active</option><option value="false">Inactive</option></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="submit-btn" onclick="saveEdit()">Save to Blockchain</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+let provider = null, signer = null, contract = null;
+let account = null;
+let contractAddress = localStorage.getItem('charityContractAddr') || '';
+let demoMode = false;
+let allCharities = [], allDonations = [];
+let historyTab = 'all';
+
+// ABI — matches CharityDonation.sol exactly
+const CONTRACT_ABI = [
+  "function addCharity(string,string,string,address) external returns (uint256)",
+  "function updateCharity(uint256,string,string,string,bool) external",
+  "function deactivateCharity(uint256) external",
+  "function donate(uint256,string) external payable",
+  "function getCharity(uint256) external view returns (tuple(uint256 id,string name,string description,string category,address walletAddress,bool isActive,uint256 totalReceived,uint256 donorCount,uint256 createdAt))",
+  "function getAllCharities() external view returns (tuple(uint256 id,string name,string description,string category,address walletAddress,bool isActive,uint256 totalReceived,uint256 donorCount,uint256 createdAt)[])",
+  "function getDonation(uint256) external view returns (tuple(uint256 id,address donor,uint256 charityId,uint256 amount,string message,uint256 timestamp,bool refunded))",
+  "function getDonorHistory(address) external view returns (uint256[])",
+  "function getCharityDonations(uint256) external view returns (uint256[])",
+  "function getTotalStats() external view returns (uint256,uint256,uint256)",
+  "function getTopCharities(uint256) external view returns (tuple(uint256 id,string name,string description,string category,address walletAddress,bool isActive,uint256 totalReceived,uint256 donorCount,uint256 createdAt)[])",
+  "function getDonorTotalGiven(address) external view returns (uint256)",
+  "function charityCount() external view returns (uint256)",
+  "function donationCount() external view returns (uint256)",
+  "function owner() external view returns (address)",
+  "event DonationMade(uint256 indexed,address indexed,uint256 indexed,uint256,uint256)",
+  "event CharityAdded(uint256 indexed,string,address,uint256)"
+];
+
+// ── WALLET ─────────────────────────────────────────────────────────────────
+async function connectWallet() {
+  if (!window.ethereum) { showAlert('dashAlert','MetaMask not found. Please install it.','error'); return; }
+  try {
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+    provider = new ethers.providers.Web3Provider(window.ethereum);
+    signer = provider.getSigner();
+    account = await signer.getAddress();
+    const network = await provider.getNetwork();
+    document.getElementById('walletStatus').textContent = 'Connected';
+    document.getElementById('walletAddr').textContent = account.slice(0,6)+'...'+account.slice(-4);
+    document.getElementById('walletAddr').style.display = 'block';
+    document.getElementById('connectBtn').textContent = 'Connected ✓';
+    document.getElementById('connectBtn').className = 'connect-btn connected';
+    document.getElementById('networkName').textContent = network.name === 'unknown' ? 'Chain '+network.chainId : network.name;
+    if (contractAddress) initContract();
+    window.ethereum.on('accountsChanged', a => { account = a[0]; document.getElementById('walletAddr').textContent = account.slice(0,6)+'...'+account.slice(-4); loadAll(); });
+  } catch(e) { showAlert('dashAlert', e.message, 'error'); }
+}
+
+function initContract() {
+  if (!signer || !contractAddress) return;
+  contract = new ethers.Contract(contractAddress, CONTRACT_ABI, signer);
+  showAlert('dashAlert','Contract connected! Loading data...','info');
+  loadAll();
+}
+
+// ── DEMO MODE ──────────────────────────────────────────────────────────────
+function useDemoMode() {
+  demoMode = true;
+  allCharities = [
+    { id:1, name:'Clean Water Initiative', description:'Providing clean drinking water to rural communities in Sub-Saharan Africa.', category:'Health', walletAddress:'0xABCDEF1234567890abcdef1234567890abcdef12', isActive:true, totalReceived:ethers.BigNumber.from('3500000000000000000'), donorCount:42, createdAt:1710000000 },
+    { id:2, name:'Education For All', description:'Funding schools and scholarships for underprivileged children worldwide.', category:'Education', walletAddress:'0x1234567890abcdef1234567890abcdef12345678', isActive:true, totalReceived:ethers.BigNumber.from('2100000000000000000'), donorCount:28, createdAt:1710100000 },
+    { id:3, name:'Amazon Reforestation', description:'Planting trees and restoring ecosystems in the Amazon rainforest.', category:'Environment', walletAddress:'0x9876543210fedcba9876543210fedcba98765432', isActive:true, totalReceived:ethers.BigNumber.from('1800000000000000000'), donorCount:19, createdAt:1710200000 },
+    { id:4, name:'Hunger Relief Fund', description:'Emergency food assistance for disaster-affected and food-insecure populations.', category:'Poverty', walletAddress:'0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef', isActive:false, totalReceived:ethers.BigNumber.from('900000000000000000'), donorCount:11, createdAt:1710300000 }
+  ];
+  allDonations = [
+    { id:1, donor:'0xabc...111', charityId:1, amount:ethers.BigNumber.from('500000000000000000'), message:'Keep up the great work!', timestamp:1710400000, refunded:false },
+    { id:2, donor:'0xdef...222', charityId:2, amount:ethers.BigNumber.from('200000000000000000'), message:'Education changes lives.', timestamp:1710410000, refunded:false },
+    { id:3, donor:'0xabc...111', charityId:3, amount:ethers.BigNumber.from('100000000000000000'), message:'For the planet!', timestamp:1710420000, refunded:false },
+    { id:4, donor:'0x123...333', charityId:1, amount:ethers.BigNumber.from('1000000000000000000'), message:'Anonymous supporter', timestamp:1710430000, refunded:false }
+  ];
+  showAlert('dashAlert','Demo mode active — showing sample data. Deploy contract for real blockchain interaction.','info');
+  renderAll();
+}
+
+// ── LOAD DATA ──────────────────────────────────────────────────────────────
+async function loadAll() {
+  if (demoMode) { renderAll(); return; }
+  if (!contract) return;
+  try {
+    allCharities = await contract.getAllCharities();
+    const donCount = (await contract.donationCount()).toNumber();
+    allDonations = [];
+    for (let i = 1; i <= donCount; i++) {
+      allDonations.push(await contract.getDonation(i));
+    }
+    renderAll();
+  } catch(e) { showAlert('dashAlert','Error loading: '+e.message,'error'); }
+}
+
+function renderAll() {
+  loadDashboard();
+  renderCharityGrid(allCharities);
+  populateDonateSelect();
+  renderHistory();
+  loadReports();
+  renderManageList();
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────────────────────
+function loadDashboard() {
+  if (demoMode || contract) {
+    const totalETH = allDonations.reduce((a,d)=> a.add(d.amount), ethers.BigNumber.from(0));
+    document.getElementById('statTotal').textContent = parseFloat(ethers.utils.formatEther(totalETH)).toFixed(3);
+    document.getElementById('statDonations').textContent = allDonations.length;
+    document.getElementById('statCharities').textContent = allCharities.length;
+    document.getElementById('statActive').textContent = allCharities.filter(c=>c.isActive).length;
+    renderTopCharities();
+    renderRecentDonations();
+  }
+}
+
+function renderTopCharities() {
+  const sorted = [...allCharities].sort((a,b)=> b.totalReceived.gt(a.totalReceived)?1:-1).slice(0,5);
+  const max = sorted[0] ? sorted[0].totalReceived : ethers.BigNumber.from(1);
+  if (!sorted.length) { document.getElementById('topCharitiesTable').innerHTML = '<div class="empty-state">No charities yet</div>'; return; }
+  let html = '<table><thead><tr><th>Charity</th><th>Category</th><th>Total (ETH)</th><th>Donors</th><th>Status</th></tr></thead><tbody>';
+  sorted.forEach(c => {
+    const eth = parseFloat(ethers.utils.formatEther(c.totalReceived)).toFixed(3);
+    const pct = max.gt(0) ? c.totalReceived.mul(100).div(max).toNumber() : 0;
+    html += `<tr>
+      <td><div style="font-weight:500;">${c.name}</div><div class="progress-bar" style="width:160px;"><div class="progress-fill" style="width:${pct}%"></div></div></td>
+      <td><span class="badge ${catBadge(c.category)}">${c.category}</span></td>
+      <td class="text-green mono">${eth}</td>
+      <td>${c.donorCount.toString()}</td>
+      <td><span class="badge ${c.isActive?'badge-green':'badge-red'}">${c.isActive?'Active':'Inactive'}</span></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('topCharitiesTable').innerHTML = html;
+}
+
+function renderRecentDonations() {
+  const recent = [...allDonations].reverse().slice(0,6);
+  if (!recent.length) { document.getElementById('recentDonationsTable').innerHTML = '<div class="empty-state">No donations yet</div>'; return; }
+  let html = '<table><thead><tr><th>#</th><th>Donor</th><th>Charity</th><th>Amount (ETH)</th><th>Date</th></tr></thead><tbody>';
+  recent.forEach(d => {
+    const charity = allCharities.find(c=>c.id == d.charityId) || {name:'Unknown'};
+    const eth = parseFloat(ethers.utils.formatEther(d.amount)).toFixed(4);
+    const date = new Date(d.timestamp.toNumber ? d.timestamp.toNumber()*1000 : d.timestamp*1000).toLocaleDateString();
+    const donor = typeof d.donor === 'string' ? d.donor.slice(0,6)+'...'+d.donor.slice(-4) : d.donor;
+    html += `<tr><td class="mono">#${d.id}</td><td class="mono">${donor}</td><td>${charity.name}</td><td class="text-green">${eth}</td><td class="text-muted">${date}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('recentDonationsTable').innerHTML = html;
+}
+
+// ── CHARITIES ──────────────────────────────────────────────────────────────
+function catBadge(cat) {
+  const map = {Education:'badge-cyan',Health:'badge-green',Environment:'badge-green',Poverty:'badge-amber','Disaster Relief':'badge-red','Animal Welfare':'badge-purple',Other:'badge-cyan'};
+  return map[cat] || 'badge-cyan';
+}
+
+function renderCharityGrid(list) {
+  if (!list.length) { document.getElementById('charityGrid').innerHTML = '<div class="empty-state"><div class="empty-state-icon">💚</div><div>No charities. Add one in Manage tab.</div></div>'; return; }
+  document.getElementById('charityGrid').innerHTML = list.map(c => {
+    const eth = parseFloat(ethers.utils.formatEther(c.totalReceived)).toFixed(3);
+    return `<div class="charity-card" onclick="openDonateFor(${c.id})">
+      <div class="charity-meta"><span class="badge ${catBadge(c.category)}">${c.category}</span><span class="badge ${c.isActive?'badge-green':'badge-red'}">${c.isActive?'Active':'Inactive'}</span></div>
+      <div class="charity-name">${c.name}</div>
+      <div class="charity-desc">${c.description}</div>
+      <div class="charity-stats">
+        <div class="c-stat"><div class="c-stat-val">${eth}</div><div class="c-stat-label">ETH raised</div></div>
+        <div class="c-stat"><div class="c-stat-val">${c.donorCount.toString()}</div><div class="c-stat-label">donors</div></div>
+      </div>
+      ${c.isActive ? `<button class="donate-btn" onclick="event.stopPropagation();openDonateFor(${c.id})">Donate →</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function filterCharities(cat) {
+  const list = cat === 'all' ? allCharities : allCharities.filter(c=>c.category===cat);
+  renderCharityGrid(list);
+}
+
+function openDonateFor(id) {
+  showSection('donate');
+  document.getElementById('donateCharitySelect').value = id;
+}
+
+function populateDonateSelect() {
+  const sel = document.getElementById('donateCharitySelect');
+  const active = allCharities.filter(c=>c.isActive);
+  sel.innerHTML = '<option value="">— Choose a charity —</option>' + active.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+}
+
+// ── DONATE ────────────────────────────────────────────────────────────────
+async function submitDonation() {
+  if (demoMode) { showAlert('donateAlert','Demo mode: donation simulated! In live mode this sends real ETH via MetaMask.','info'); return; }
+  if (!contract || !account) { showAlert('donateAlert','Please connect MetaMask and set up contract first.','error'); return; }
+  const charityId = document.getElementById('donateCharitySelect').value;
+  const amount = document.getElementById('donateAmount').value;
+  const message = document.getElementById('donateMessage').value;
+  if (!charityId) { showAlert('donateAlert','Please select a charity.','error'); return; }
+  if (!amount || isNaN(amount) || parseFloat(amount) <= 0) { showAlert('donateAlert','Enter a valid ETH amount.','error'); return; }
+  try {
+    document.getElementById('donateSubmitBtn').disabled = true;
+    document.getElementById('donateSubmitBtn').textContent = 'Waiting for MetaMask...';
+    const tx = await contract.donate(charityId, message, { value: ethers.utils.parseEther(amount) });
+    document.getElementById('donateSubmitBtn').textContent = 'Confirming...';
+    await tx.wait();
+    showAlert('donateAlert',`✓ Donation of ${amount} ETH confirmed on-chain! TX: ${tx.hash.slice(0,16)}...`,'success');
+    document.getElementById('donateAmount').value = '';
+    document.getElementById('donateMessage').value = '';
+    loadAll();
+  } catch(e) {
+    showAlert('donateAlert', e.reason || e.message, 'error');
+  } finally {
+    document.getElementById('donateSubmitBtn').disabled = false;
+    document.getElementById('donateSubmitBtn').textContent = 'Send Donation via MetaMask';
+  }
+}
+
+// ── HISTORY ───────────────────────────────────────────────────────────────
+function switchHistoryTab(tab, el) {
+  historyTab = tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderHistory();
+}
+
+function renderHistory() {
+  let list = [...allDonations].reverse();
+  if (historyTab === 'mine' && account) list = list.filter(d=>d.donor.toLowerCase()===account.toLowerCase());
+  if (!list.length) { document.getElementById('historyTable').innerHTML = '<div class="empty-state"><div class="empty-state-icon">🕐</div><div>No records found</div></div>'; return; }
+  let html = '<table><thead><tr><th>ID</th><th>Donor</th><th>Charity</th><th>Amount</th><th>Message</th><th>Date</th></tr></thead><tbody>';
+  list.forEach(d=>{
+    const charity = allCharities.find(c=>c.id == d.charityId)||{name:'Unknown'};
+    const eth = parseFloat(ethers.utils.formatEther(d.amount)).toFixed(4);
+    const ts = d.timestamp.toNumber ? d.timestamp.toNumber() : d.timestamp;
+    const date = new Date(ts*1000).toLocaleString();
+    const donor = typeof d.donor === 'string' ? d.donor.slice(0,6)+'...'+d.donor.slice(-4) : d.donor;
+    html+=`<tr><td class="mono">#${d.id}</td><td class="mono">${donor}</td><td>${charity.name}</td><td class="text-green">${eth} ETH</td><td class="text-muted" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;">${d.message||'—'}</td><td class="text-muted">${date}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById('historyTable').innerHTML = html;
+}
+
+// ── REPORTS ───────────────────────────────────────────────────────────────
+function loadReports() {
+  const myDonations = account ? allDonations.filter(d=>d.donor.toLowerCase()===account.toLowerCase()) : [];
+  const myTotal = myDonations.reduce((a,d)=>a.add(d.amount), ethers.BigNumber.from(0));
+  const myCharitiesSet = new Set(myDonations.map(d=>d.charityId.toString()));
+  document.getElementById('rptMyTotal').textContent = parseFloat(ethers.utils.formatEther(myTotal)).toFixed(3);
+  document.getElementById('rptMyCount').textContent = myDonations.length;
+  document.getElementById('rptMyCharities').textContent = myCharitiesSet.size;
+
+  // Charity breakdown table
+  if (!allCharities.length) { document.getElementById('charityBreakdown').innerHTML='<div class="empty-state">No data</div>'; }
+  else {
+    let html='<table><thead><tr><th>Charity</th><th>Category</th><th>Total Raised (ETH)</th><th>Donors</th><th>Donations</th><th>Status</th></tr></thead><tbody>';
+    const sorted=[...allCharities].sort((a,b)=>b.totalReceived.gt(a.totalReceived)?1:-1);
+    sorted.forEach(c=>{
+      const eth=parseFloat(ethers.utils.formatEther(c.totalReceived)).toFixed(3);
+      const donCount=allDonations.filter(d=>d.charityId==c.id).length;
+      html+=`<tr><td style="font-weight:500;">${c.name}</td><td><span class="badge ${catBadge(c.category)}">${c.category}</span></td><td class="text-green">${eth}</td><td>${c.donorCount.toString()}</td><td>${donCount}</td><td><span class="badge ${c.isActive?'badge-green':'badge-red'}">${c.isActive?'Active':'Inactive'}</span></td></tr>`;
+    });
+    html+='</tbody></table>';
+    document.getElementById('charityBreakdown').innerHTML=html;
+  }
+
+  // Personal timeline
+  if (!myDonations.length) { document.getElementById('myTimeline').innerHTML='<div class="empty-state">No personal donations yet</div>'; }
+  else {
+    let html='<table><thead><tr><th>Date</th><th>Charity</th><th>Amount (ETH)</th><th>Message</th></tr></thead><tbody>';
+    [...myDonations].reverse().forEach(d=>{
+      const charity=allCharities.find(c=>c.id==d.charityId)||{name:'Unknown'};
+      const eth=parseFloat(ethers.utils.formatEther(d.amount)).toFixed(4);
+      const ts=d.timestamp.toNumber?d.timestamp.toNumber():d.timestamp;
+      html+=`<tr><td class="text-muted">${new Date(ts*1000).toLocaleDateString()}</td><td>${charity.name}</td><td class="text-green">${eth}</td><td class="text-muted">${d.message||'—'}</td></tr>`;
+    });
+    html+='</tbody></table>';
+    document.getElementById('myTimeline').innerHTML=html;
+  }
+}
+
+// ── MANAGE ────────────────────────────────────────────────────────────────
+async function addCharity() {
+  if (demoMode) {
+    const name=document.getElementById('mgmtName').value;
+    const desc=document.getElementById('mgmtDesc').value;
+    const cat=document.getElementById('mgmtCategory').value;
+    const wallet=document.getElementById('mgmtWallet').value;
+    if(!name||!wallet){showAlert('manageAlert','Fill all required fields.','error');return;}
+    const newId=allCharities.length+1;
+    allCharities.push({id:newId,name,description:desc,category:cat,walletAddress:wallet,isActive:true,totalReceived:ethers.BigNumber.from(0),donorCount:0,createdAt:Math.floor(Date.now()/1000)});
+    showAlert('manageAlert',`✓ "${name}" added (demo mode).`,'success');
+    renderAll();
+    return;
+  }
+  if(!contract){showAlert('manageAlert','Connect contract first.','error');return;}
+  const name=document.getElementById('mgmtName').value;
+  const desc=document.getElementById('mgmtDesc').value;
+  const cat=document.getElementById('mgmtCategory').value;
+  const wallet=document.getElementById('mgmtWallet').value;
+  if(!name||!wallet){showAlert('manageAlert','Fill all required fields.','error');return;}
+  try {
+    const tx=await contract.addCharity(name,desc,cat,wallet);
+    showAlert('manageAlert','Waiting for confirmation...','info');
+    await tx.wait();
+    showAlert('manageAlert',`✓ "${name}" added on-chain!`,'success');
+    ['mgmtName','mgmtDesc','mgmtWallet'].forEach(id=>document.getElementById(id).value='');
+    loadAll();
+  } catch(e){showAlert('manageAlert',e.reason||e.message,'error');}
+}
+
+function renderManageList() {
+  if(!allCharities.length){document.getElementById('manageList').innerHTML='<div class="empty-state">No charities</div>';return;}
+  let html='<table><thead><tr><th>Name</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+  allCharities.forEach(c=>{
+    html+=`<tr><td style="font-weight:500;">${c.name}</td><td><span class="badge ${catBadge(c.category)}">${c.category}</span></td><td><span class="badge ${c.isActive?'badge-green':'badge-red'}">${c.isActive?'Active':'Inactive'}</span></td>
+    <td><button class="btn-secondary" style="padding:5px 12px;font-size:11px;margin-right:4px;" onclick="openEdit(${c.id})">Edit</button>${c.isActive?`<button class="btn-secondary" style="padding:5px 12px;font-size:11px;color:var(--danger);" onclick="deactivate(${c.id})">Deactivate</button>`:''}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById('manageList').innerHTML=html;
+}
+
+function openEdit(id){
+  const c=allCharities.find(x=>x.id==id);if(!c)return;
+  document.getElementById('editId').value=id;
+  document.getElementById('editName').value=c.name;
+  document.getElementById('editDesc').value=c.description;
+  document.getElementById('editCat').value=c.category;
+  document.getElementById('editActive').value=c.isActive.toString();
+  document.getElementById('editModal').classList.add('open');
+}
+
+async function saveEdit(){
+  const id=parseInt(document.getElementById('editId').value);
+  const name=document.getElementById('editName').value;
+  const desc=document.getElementById('editDesc').value;
+  const cat=document.getElementById('editCat').value;
+  const isActive=document.getElementById('editActive').value==='true';
+  if(demoMode){
+    const idx=allCharities.findIndex(c=>c.id==id);
+    if(idx>-1){allCharities[idx]={...allCharities[idx],name,description:desc,category:cat,isActive};}
+    closeModal();renderAll();return;
+  }
+  if(!contract){closeModal();return;}
+  try{
+    const tx=await contract.updateCharity(id,name,desc,cat,isActive);
+    await tx.wait();
+    closeModal();loadAll();
+  }catch(e){alert(e.reason||e.message);}
+}
+
+async function deactivate(id){
+  if(!confirm('Deactivate this charity?'))return;
+  if(demoMode){
+    const idx=allCharities.findIndex(c=>c.id==id);
+    if(idx>-1)allCharities[idx].isActive=false;
+    renderAll();return;
+  }
+  if(!contract)return;
+  try{const tx=await contract.deactivateCharity(id);await tx.wait();loadAll();}catch(e){alert(e.reason||e.message);}
+}
+
+function closeModal(){document.getElementById('editModal').classList.remove('open');}
+
+// ── SETUP ─────────────────────────────────────────────────────────────────
+function saveContractAddress(){
+  const addr=document.getElementById('contractAddressInput').value.trim();
+  if(!ethers.utils.isAddress(addr)){showAlert('setupAlert','Invalid Ethereum address.','error');return;}
+  contractAddress=addr;
+  localStorage.setItem('charityContractAddr',addr);
+  document.getElementById('contractStatus').innerHTML=`<div class="alert alert-success show">✓ Contract address saved. <span class="mono">${addr.slice(0,10)}...${addr.slice(-6)}</span></div>`;
+  if(signer)initContract();
+  else showAlert('setupAlert','Connect MetaMask to interact with this contract.','info');
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────
+function showSection(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')==="showSection('"+id+"')")n.classList.add('active');});
+}
+
+function showAlert(id,msg,type){
+  const el=document.getElementById(id);if(!el)return;
+  el.className=`alert alert-${type} show`;
+  el.textContent=msg;
+  if(type!=='info')setTimeout(()=>el.classList.remove('show'),6000);
+}
+
+// Init
+if(contractAddress)document.getElementById('contractAddressInput').value=contractAddress;
+</script>
+</body>
+</html>
